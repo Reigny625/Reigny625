@@ -1,0 +1,295 @@
+package composerMain;
+import java.util.*;
+import javax.sound.midi.*;
+
+/*
+
+-Finish and implement reVoice()
+-Implement doubleRoot
+
+*/
+
+@SuppressWarnings("unused")
+public class ComposerMain {
+	
+	private static final List<String> noteEquivalencies = Arrays.asList("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B");
+	private static final List<String> majorChordEquivalencies = Arrays.asList("C", "Dm", "Em", "F", "G", "Am", "Bm*");
+	private static final List<String> minorChordEquivalencies = Arrays.asList("Am", "Bm*", "C", "Dm", "Em", "E", "F", "G", "G#m*");
+	private static MidiChannel[] channels;
+	private static final int INSTRUMENT = 0; // 0 is a piano, 9 is percussion
+	private static int volume = 80; // between 0 and 127															//This sets the volume
+	private static int tempo = 60000/(92); //in milliseconds = 60000/bpm											//This sets the tempo
+	private static int[][] phraseMelody;
+	private static int[][][] phraseChords;
+	private static enum TimeSignature{
+		THREE_FOUR,
+		FOUR_FOUR,
+		SIX_EIGHT
+	}
+	private static enum Key{
+		A_MINOR,
+		C_MAJOR
+	}
+	private static TimeSignature timeSignature;
+	private static Key key;
+	private static Random rand;
+	private static final HashMap<String, int[]> chordBreakdowns = new HashMap<String, int[]>();
+	
+	public static void main(String[] args) {
+		chordBreakdowns.put("C", new int[] {id("3C"), id("3E"), id("3G")});
+		chordBreakdowns.put("Dm", new int[] {id("3D"), id("3F"), id("3A")});
+		chordBreakdowns.put("Em", new int[] {id("3E"), id("3G"), id("3B")});
+		chordBreakdowns.put("E", new int[] {id("3E"), id("3G#"), id("3B")});
+		chordBreakdowns.put("F", new int[] {id("3F"), id("3A"), id("3C")});
+		chordBreakdowns.put("G", new int[] {id("3G"), id("3B"), id("3D")});
+		chordBreakdowns.put("G#m*", new int[] {id("3G#"), id("3Bb"), id("3Db")});
+		chordBreakdowns.put("Am", new int[] {id("3A"), id("3C"), id("3E")});
+		chordBreakdowns.put("Bm*", new int[] {id("3B"), id("3D"), id("3F")});
+		
+		timeSignature = TimeSignature.THREE_FOUR; 																	//This sets the time signature
+		key = Key.C_MAJOR;																							//This sets the key
+		rand = new Random();
+		
+		initPhrase();
+		composePhrase();
+		for(int i = 0; i < 3; i++) {
+			playPhrase();
+		}
+	}
+	
+	private static void playPhrase() {
+		try {
+		Synthesizer synth = MidiSystem.getSynthesizer();
+		synth.open();
+		channels = synth.getChannels();
+		boolean arpeggiate = rand.nextBoolean();
+		boolean doubleRoot = true;//rand.nextBoolean();
+		int[] currentChordNotes = new int[3];
+		
+		/*
+		if(doubleRoot) {
+			channels[INSTRUMENT].noteOn(currentChordNotes[0], volume);
+		}
+		*/
+		
+		for(int i = 0; i < 8; i ++) {
+			currentChordNotes = chordBreakdowns.get(minorChordEquivalencies.get(phraseChords[i][0][0]));			//selects the chord for (the beginning of) the bar
+			if(arpeggiate == true) {
+				if(timeSignature == TimeSignature.FOUR_FOUR) {														// 4/4{
+					channels[INSTRUMENT].noteOn(phraseMelody[i][0], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[0], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][0]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[0]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][1], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[1], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][1]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[1]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][2], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[2], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][2]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[2]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][3], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[1], volume);
+					rest(0.5);
+					currentChordNotes = chordBreakdowns.get(minorChordEquivalencies.get(phraseChords[i][1][0]));
+					channels[INSTRUMENT].noteOff(phraseMelody[i][3]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[1]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][4], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[0], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][4]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[0]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][5], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[1], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][5]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[1]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][6], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[2], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][6]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[2]);
+					channels[INSTRUMENT].noteOn(phraseMelody[i][7], volume);
+					channels[INSTRUMENT].noteOn(currentChordNotes[1], volume);
+					rest(0.5);
+					channels[INSTRUMENT].noteOff(phraseMelody[i][7]);
+					channels[INSTRUMENT].noteOff(currentChordNotes[1]);
+				} else if(timeSignature == TimeSignature.THREE_FOUR){												// 3/4{
+					for(int j = 0; j < 6; j++) {
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						channels[INSTRUMENT].noteOn(currentChordNotes[j % 3], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+						channels[INSTRUMENT].noteOff(currentChordNotes[j % 3]);
+					}																								// }3/4
+				} else {																							// 6/8{
+					for(int j = 0; j < 3; j++) {
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						channels[INSTRUMENT].noteOn(currentChordNotes[j % 3], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+						channels[INSTRUMENT].noteOff(currentChordNotes[j % 3]);
+					}
+					currentChordNotes = chordBreakdowns.get(minorChordEquivalencies.get(phraseChords[i][1][0]));
+					for(int j = 3; j < 6; j++) {
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						channels[INSTRUMENT].noteOn(currentChordNotes[j % 3], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+						channels[INSTRUMENT].noteOff(currentChordNotes[j % 3]);
+					}					
+				}																									// }6/8
+			} else {
+				for(int j = 0; j < 3; j++) {																		//plays the chord for (the beginning of) the bar
+					channels[INSTRUMENT].noteOn(currentChordNotes[j], volume);
+				}
+				if(timeSignature == TimeSignature.FOUR_FOUR) {														// 4/4{
+					for(int j = 0; j < 4; j++) {																	//plays the first half of the melody notes of the bar
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+					}
+					for(int j = 0; j < 3; j++) {																	//unplays the chord for the beginning of the bar
+						channels[INSTRUMENT].noteOff(currentChordNotes[j]);
+					}
+					currentChordNotes = chordBreakdowns.get(minorChordEquivalencies.get(phraseChords[i][1][0]));	//selects the chord for the end of the bar
+					for(int j = 0; j < 3; j++) {																	//plays the chord for the end of the bar
+						channels[INSTRUMENT].noteOn(currentChordNotes[j], volume);
+					}
+					for(int j = 4; j < 8; j++) {																	//plays the seconds half of the melody notes of the bar
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+					}																								// }4/4
+				} else if(timeSignature == TimeSignature.THREE_FOUR){												// 3/4{
+					for(int j = 0; j < 6; j++) {																	//plays all the melody notes of the bar
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+					}																								// }3/4
+				} else {																							// 6/8{
+					for(int j = 0; j < 3; j++) {																	//plays the first half of the melody notes of the bar
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+					}
+					for(int j = 0; j < 3; j++) {																	//unplays the chord for the beginning of the bar
+						channels[INSTRUMENT].noteOff(currentChordNotes[j]);
+					}
+					currentChordNotes = chordBreakdowns.get(minorChordEquivalencies.get(phraseChords[i][1][0]));	//selects the chord for the end of the bar
+					for(int j = 0; j < 3; j++) {																	//plays the chord for the end of the bar
+						channels[INSTRUMENT].noteOn(currentChordNotes[j], volume);
+					}
+					for(int j = 3; j < 6; j++) {																	//plays the seconds half of the melody notes of the bar
+						channels[INSTRUMENT].noteOn(phraseMelody[i][j], volume);
+						rest(0.5);
+						channels[INSTRUMENT].noteOff(phraseMelody[i][j]);
+					}					
+				}																									// }6/8
+			}
+			
+			for(int j = 0; j < 3; j++) {
+				channels[INSTRUMENT].noteOff(currentChordNotes[j]);
+			}
+		}
+		channels[INSTRUMENT].allNotesOff();
+		synth.close();
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private static void composePhrase() {
+		
+		if(key.equals(Key.A_MINOR)) {
+			phraseChords[0][0][0] = 0;
+			phraseChords[7][0][0] = rand.nextBoolean() ? 4 : 5;
+		}
+		if(key.equals(Key.C_MAJOR)) {
+			phraseChords[0][0][0] = 0;
+			phraseChords[7][0][0] = 4;
+		}
+		
+		for(int i = 1; i < phraseChords.length - 1; i ++) {
+			
+			if(timeSignature.equals(TimeSignature.THREE_FOUR)) {
+				
+				phraseChords[i][0][0] = rand.nextInt(phraseChords.length - 1);
+				
+			} else {
+				
+			}
+		}
+	}
+	
+	private static void initPhrase() {
+		System.out.println(timeSignature + ", " + key);
+		
+		if(timeSignature == TimeSignature.THREE_FOUR) {
+			phraseMelody = new int[8][6];
+			phraseChords = new int[8][1][1];
+		} else if(timeSignature == TimeSignature.FOUR_FOUR) {
+			phraseMelody = new int[8][8];
+			phraseChords = new int[8][2][1];
+		} else if(timeSignature == TimeSignature.SIX_EIGHT) {
+			phraseMelody = new int[8][6];
+			phraseChords = new int[8][2][1];
+		}
+	}
+	
+	private static int[] reVoice(int[] chord) {
+		for(int i = 0; i < chord.length; i++) {
+			if(noteEquivalencies.indexOf(noteName(chord[i]).charAt(1)) > 4) {
+				chord[i] = (rand.nextInt(3) == 0)? chord[i] - 12 : chord[i];
+			} else {
+				chord[i] = (rand.nextInt(3) == 0)? chord[i] - 12 : chord[i];
+			}
+		}
+		return chord;
+	}
+	
+	private static void playNote(String noteList, double duration) throws InterruptedException
+	{
+		String[] notes = noteList.replaceAll(" ", "").replaceAll("Db", "C#").replaceAll("Eb", "D#").replaceAll("Gb", "F#").replaceAll("Ab", "G#").replaceAll("Ab", "B#").split(",");
+		// * start playing a note
+		for(String note: notes) {
+			channels[INSTRUMENT].noteOn(id(note), volume);
+		}
+		
+		// * wait
+		Thread.sleep((int)(duration * tempo));
+		// * stop playing a note
+		for(String note: notes) {
+			channels[INSTRUMENT].noteOff(id(note));
+		}
+	}
+	
+	/**
+	 * Plays nothing for the given duration
+	 */
+	private static void rest(double duration) throws InterruptedException
+	{
+		Thread.sleep((int)(duration * tempo));
+	}
+	
+	/**
+	 * Returns the MIDI id for a given note: eg. 4C -> 60
+	 * @return
+	 */
+	private static int id(String note)
+	{
+		int octave = Integer.parseInt(note.substring(0, 1));
+		if(note.length() > 2 && note.charAt(2) == 'b') {															//If it's a flat, then this turns it into the enharmonic sharp
+			note = noteName(id(note.substring(0, 2)) - 1);
+		}
+		return noteEquivalencies.indexOf(note.substring(1)) + (12 * octave) + 12;	
+	}
+	
+	private static String noteName(int id) {
+		int octave = (id / 12) - 1;
+		return octave + noteEquivalencies.get(id % 12);
+	}
+}
