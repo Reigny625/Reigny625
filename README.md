@@ -1,0 +1,8 @@
+- 🔭 I’m currently working either nothing or a ton of stuff, depending on your perspective.
+- 🌱 I’m currently learning Java and music theory.
+- 👯 I’m not looking to collaborate.
+- 🤔 I’m not looking for help.
+- 💬 Don't ask me about anything.
+- 📫 How to reach me: don't.
+- 😄 Pronouns: Any
+- ⚡ Fun fact: I'm a violinist and composer. A lot of my stuff revolves around music theory and stuff.
