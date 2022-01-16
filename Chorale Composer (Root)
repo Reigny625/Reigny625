@@ -55,10 +55,27 @@ public class Main {
 				System.out.print(Arrays.toString(voicedChords[i]));
 				System.out.print("   ");
 			}
-			//playNotes(voicedChords[0][0] + ", " + voicedChords[0][1] + ", " + voicedChords[0][2] + ", " + voicedChords[0][3], 4);
 			
-			//playChords(); TO BE WRITTEN
+			//For testing purposes only. Delete voicedChords is consistently fully defined
+			for(int i = 0; i < 4; i++) {
+				playNotes(voicedChords[i][0] + ", " + voicedChords[i][1] + ", " + voicedChords[i][2] + ", " + voicedChords[i][3], 1.3);
+			}
+			rest(1);
 			
+			//playChords(1.3);
+			
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private static void playChords(int beatsPerChords) {
+		try {
+			for(int i = 0; i < voicedChords.length; i++) {
+				playNotes(voicedChords[i][0] + ", " + voicedChords[i][1] + ", " + voicedChords[i][2] + ", " + voicedChords[i][3], beatsPerChords);
+			}
+			rest(1);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -88,15 +105,15 @@ public class Main {
 		
 		//All the other chords
 		//for(int i = 1; i < chordProgression.length; i++) {	//loops through all non-bass voices of the chord under construction
-		for (int i = 1; i < 2; i++) { //TEMPORARY LINE. Replace with above when ready
+		for (int i = 1; i < 4; i++) { //TEMPORARY LINE. Replace with above when ready
 			remainingTones = new ArrayList<Integer>();
 			remainingTones.add(1);
 			remainingTones.add(3);
 			remainingTones.add(5);
 			
 			if(chordProgression[i-1] == chordProgression[i]) {	//identifies if it's a repeated chord
-				
-			} else {
+				//TO DO HEREHERE TO DO
+			} else if(true) {	//TO DO HEREHERE TO DO: Replace with if(Distance between roots is a 4th/5th or 3rd/6th)
 				//Copies all common tones
 				for(int j = 1; j <= 3; j++) {	//loops through all non-bass voices of the previous chord
 					for(int k = 0; k < remainingTones.size(); k++) {	//loops through all remaining chord tones
@@ -109,15 +126,14 @@ public class Main {
 				}
 				
 				//Places stepwise tones accordingly
-				int count = 0; //This 'count' is just for testing
-				while(remainingTones.size() > 0 && count < 100) {
+				while(remainingTones.size() > 0) {
 					for(int j = 1; j <= 3; j++) {	//loops through all non-bass voices of the chord under construction
 						if(voicedChords[i][j] == null) {
 							int conjunctPossibilities = 0;
 							int possibleConjunctCToneIndex = -1;
 							
 							for(int k = 0; k < remainingTones.size(); k++) {
-								String previousNote = voicedChords[i-1][j].substring(0, voicedChords[i-1][j].length()-1);
+								String previousNote = voicedChords[i-1][j].substring(1);
 								String possibleTargetNote = chordToTone(chordProgression[i], remainingTones.get(k));
 								if( Math.abs(id("4" + previousNote) - id("4" + possibleTargetNote)) < 3 ||
 									Math.abs(id("3" + previousNote) - id("4" + possibleTargetNote)) < 3 ||
@@ -125,24 +141,52 @@ public class Main {
 									
 									conjunctPossibilities++;
 									possibleConjunctCToneIndex = k;
-									//HEREHEREHEREHEREHEREHEREHEREHEREHERE Error explanation: E should not be followed by B. It is not conjunct (stepwise)
 								}
 							}
 							
 							if(conjunctPossibilities == 1) {
 								voicedChords[i][j] = chordToTone(chordProgression[i], remainingTones.get(possibleConjunctCToneIndex));
-								System.out.println(remainingTones.toString());
 								remainingTones.remove(possibleConjunctCToneIndex);
 							}
-							
-							//Probably delete these 2 lines later?{
-							conjunctPossibilities = 0;
-							possibleConjunctCToneIndex = -10000;
-							//}
 						}
 					}
-					count++;
 				}
+				
+				//Gives octaves to the non-bass voices
+				for(int j = 1; j < 4; j++) {
+					if(!Character.isDigit(voicedChords[i][j].charAt(0))) {
+						if((int)voicedChords[i][j].charAt(0) >= 68 || voicedChords[i][j].charAt(0) == 'A') {
+							voicedChords[i][j] = voicedChords[i-1][j].charAt(0) + voicedChords[i][j];
+						} else {
+							switch (voicedChords[i-1][j].substring(1)) {
+							case "C":
+							case "C#":
+								if(voicedChords[i][j].equals("B") || voicedChords[i][j].equals("A#")) {
+									voicedChords[i][j] = "" + (Character.getNumericValue(voicedChords[i-1][j].charAt(0)) - 1) + voicedChords[i][j];
+								}
+								break;
+							case "B":
+							case "A#":
+								if(voicedChords[i][j].equals("C") || voicedChords[i][j].equals("C#")) {
+									voicedChords[i][j] = "" + (Character.getNumericValue(voicedChords[i-1][j].charAt(0)) + 1) + voicedChords[i][j];
+								}
+								break;
+							}
+						}
+					}
+				}
+				
+				//Adds the bass voice below tenor
+				int octave = Character.getNumericValue(voicedChords[i][3].charAt(0)) + 1;
+				voicedChords[i][0] = chordToTone(chordProgression[i], 1);
+				voicedChords[i][0] = "" + octave + voicedChords[i][0];
+				while(id(voicedChords[i][0]) >= id(voicedChords[i][1])) {
+					octave--;
+					voicedChords[i][0] = "" + octave + voicedChords[i][0].substring(1);
+				}
+				
+			} else if(true) {	//TO DO HEREHERE TO DO: Replace with if(Distance between roots is a 2nd/7th)
+				System.out.println("Got the the 2nds/7ths statement, Oh No!");
 			}
 			
 		}
@@ -166,6 +210,7 @@ public class Main {
 	private static void setChordProgression() {
 		//chordProgression = new int[8];
 		chordProgression = new int[] {1, 5, 1, 4, 3, 1, 1, 5};
+		//Set to randomized chord progression based on the table?
 	}
 	
 	private static void initStaff() {
