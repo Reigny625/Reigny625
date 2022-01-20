@@ -23,7 +23,17 @@ public class Main {
 	private static ArrayList<Integer> remainingTones;
 	/*
 	 * Notes:
-	 * voiceStaticUnison left a repeated chord in the same voicing as the one before it. This might be fixed now, I'm not completely sure. Test, but don't worry too much about it
+	 * voice3645 has an index -1 out of bounds exception (for length 7) on line 206 (voiceChords ln 120, chordToTone ln 294)
+	 * 
+	 * Got an infinite loop somehow
+	 * 
+	 * Got some VERY high/low notes:
+	 * "C:[3C, 3G, 4E, 5C]  D:[3D, 3F, 4D, 4A]  G:[12G, 3G, 4D, B]  C:[13C, 3G, 4E, C]  C:[1C, 1E, 1G, 2C]  E:[0E, 1E, 1G, 1B]  A:[0A, 1E, 1A, 2C]  C:[1C, 1E, 1G, 2C]"
+	 * 
+	 * Index 0 out of bound for length 0 error on ln 287 of voiceStaticUnison
+	 * 
+	 * In voice3645, The soprano still sometimes isn't given an octave. (Probably causing the very high/low notes in bass)
+	 * 
 	 */
 
 	public static void main(String[] args){
@@ -34,27 +44,23 @@ public class Main {
 			synth.open();
 			channels = synth.getChannels();
 			
-			
-			/*	Rhythmic testing
-			int minNoteValue = 256;
-			int num = (int)(Math.log(minNoteValue/4) / Math.log(2));
-			for(int i = 0; i <= num; i++) {
-				for(int j = 0; j < Math.pow(2, i); j++) {
-					playNote(Double.toString(Math.random()*6+2) + "C", 1.0/Math.pow(2, i));
-				}
-			}
-			*/
 			initStaff();
 			
-			setChordProgression();
+			setChordProgression(1);
 			
 			voiceChords();
 			
+			System.out.println("The tempo is: " + tempo + "bpm");
+			System.out.println(noteName(key+12).substring(1) + " " + (isMajor ? "Major" : "minor"));
+			
+			//Prints the chord progression in two forms
 			System.out.println(Arrays.toString(chordProgression));
 			for(int chordNumeral: chordProgression) {
 				System.out.print(chordToTone(chordNumeral, 1) + " ");
 			}
 			System.out.println();
+			
+			//Prints the entire voiced chord progression in groups groups (chords) of four notes
 			for(int i = 0; i < voicedChords.length; i++) {
 				System.out.print(chordToTone(chordProgression[i], 1) + ":");
 				System.out.print(Arrays.toString(voicedChords[i]));
@@ -195,6 +201,11 @@ public class Main {
 			
 		}
 		
+		//Eliminates a spacing error in the bass
+		while(id(voicedChords[i][0]) > id(voicedChords[i][1])) {
+			voicedChords[i][0] = "" + (Character.getNumericValue(voicedChords[i][0].charAt(0)) - 1) + voicedChords[i][0].substring(1);
+		}
+		
 	}
 	
 	private static void voice3645(int i) {
@@ -265,6 +276,7 @@ public class Main {
 		while(id(voicedChords[i][0]) >= id(voicedChords[i][1])) {
 			octave--;
 			voicedChords[i][0] = "" + octave + voicedChords[i][0].substring(1);
+			System.out.println(voicedChords[i][0]);
 		}
 		
 	}
@@ -301,17 +313,76 @@ public class Main {
 		}
 	}
 	
-	private static void setChordProgression() {
-		//chordProgression = new int[8];
-		chordProgression = new int[] {1, 5, 1, 4, 3, 5, 5, 6};
-		//Set to randomized chord progression based on the table?
+	private static void setChordProgression(int phrases) {
+		chordProgression = new int[] {1, 2, 3, 4, 5, 6, 7, 1};
+		
+		int[][] toOptions = {	{},
+								{1, 2, 3, 4, 5, 6},
+								{5},
+								{6},
+								{2, 3, 5},
+								{1},	//and sometimes 6
+								{2, 4}
+		};
+		int[][] fromOptions = {	{},
+								{1, 5},
+								{1, 4, 6},
+								{1, 4},
+								{1, 6},
+								{2, 4},
+								{3}		//and sometimes 5
+		};
+		
+		chordProgression = new int[8 * phrases];
+		for(int phrase = 1; phrase <= phrases; phrase++) {
+			chordProgression[8*(phrase-1)] = 1;
+			for(int j = 1; j < 8; j++) {
+				int chordIndex = (phrase-1)*8 + j;
+				if(phrase == phrases) {
+					
+					if(j == 7) {
+						chordProgression[phrases*8 -1] = 1;
+					} else {
+						if((int)(Math.random()*9) == 0) {
+							chordProgression[chordIndex] = chordProgression[chordIndex-1];
+						} else {
+							int prevChord = chordProgression[chordIndex-1];
+							int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
+							if((int)(Math.random()*9) == 0) {
+								chordProgression[chordIndex] = prevChord;
+							} else {
+								int nextChord = toOptions[prevChord][randNextChord];
+								chordProgression[chordIndex] = nextChord;
+							}
+						}
+					}
+					
+				} else {
+					
+					if(j == 7) {
+						chordProgression[phrases*8 -1] = 5;
+					} else {
+						int prevChord = chordProgression[chordIndex-1];
+						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
+						if((int)(Math.random()*9) == 0) {
+							chordProgression[chordIndex] = prevChord;
+						} else {
+							int nextChord = toOptions[prevChord][randNextChord];
+							chordProgression[chordIndex] = nextChord;
+						}
+					}
+					
+				}
+			}
+		}
+		
 	}
 	
 	private static void initStaff() {
 		volume = 40; // between 0 and 127 inclusive
 		tempo = 60;	//tempo in bpm
 		updateTempo();
-		key = (int)(Math.random()*12);
+		key = 0; //(int)(Math.random()*12);
 		isMajor = Math.random()<0.5;
 	}
 	
