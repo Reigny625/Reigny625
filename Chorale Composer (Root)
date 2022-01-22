@@ -23,16 +23,8 @@ public class Main {
 	private static ArrayList<Integer> remainingTones;
 	/*
 	 * Notes:
-	 * voice3645 has an index -1 out of bounds exception (for length 7) on line 206 (voiceChords ln 120, chordToTone ln 294)
 	 * 
-	 * Got an infinite loop somehow
-	 * 
-	 * Got some VERY high/low notes:
-	 * "C:[3C, 3G, 4E, 5C]  D:[3D, 3F, 4D, 4A]  G:[12G, 3G, 4D, B]  C:[13C, 3G, 4E, C]  C:[1C, 1E, 1G, 2C]  E:[0E, 1E, 1G, 1B]  A:[0A, 1E, 1A, 2C]  C:[1C, 1E, 1G, 2C]"
-	 * 
-	 * Index 0 out of bound for length 0 error on ln 287 of voiceStaticUnison
-	 * 
-	 * In voice3645, The soprano still sometimes isn't given an octave. (Probably causing the very high/low notes in bass)
+	 * Got an infinite loop somehow (many times now)
 	 * 
 	 */
 
@@ -54,11 +46,11 @@ public class Main {
 			System.out.println(noteName(key+12).substring(1) + " " + (isMajor ? "Major" : "minor"));
 			
 			//Prints the chord progression in two forms
-			System.out.println(Arrays.toString(chordProgression));
+			System.out.print(Arrays.toString(chordProgression) + "        ");
 			for(int chordNumeral: chordProgression) {
 				System.out.print(chordToTone(chordNumeral, 1) + " ");
 			}
-			System.out.println();
+			System.out.println("\n");
 			
 			//Prints the entire voiced chord progression in groups groups (chords) of four notes
 			for(int i = 0; i < voicedChords.length; i++) {
@@ -72,6 +64,12 @@ public class Main {
 			
 		} catch (Exception e) {
 			e.printStackTrace();
+
+			for(int i = 0; i < voicedChords.length; i++) {
+				System.out.print(chordToTone(chordProgression[i], 1) + ":");
+				System.out.print(Arrays.toString(voicedChords[i]));
+				System.out.print("  ");
+			}
 		}
 	}
 	
@@ -248,7 +246,7 @@ public class Main {
 		//Gives octaves to the non-bass voices
 		for(int j = 1; j < 4; j++) {
 			if(!Character.isDigit(voicedChords[i][j].charAt(0))) {
-				if((int)voicedChords[i][j].charAt(0) >= 68 || voicedChords[i][j].charAt(0) == 'A') {
+				if( ((int)voicedChords[i][j].charAt(0)) >= 68 || voicedChords[i][j].charAt(0) == 'A') {
 					voicedChords[i][j] = voicedChords[i-1][j].charAt(0) + voicedChords[i][j];
 				} else {
 					switch (voicedChords[i-1][j].substring(1)) {
@@ -264,6 +262,8 @@ public class Main {
 							voicedChords[i][j] = "" + (Character.getNumericValue(voicedChords[i-1][j].charAt(0)) + 1) + voicedChords[i][j];
 						}
 						break;
+					default:
+						voicedChords[i][j] = "" + (Character.getNumericValue(voicedChords[i-1][j].charAt(0))) + voicedChords[i][j];
 					}
 				}
 			}
@@ -276,7 +276,6 @@ public class Main {
 		while(id(voicedChords[i][0]) >= id(voicedChords[i][1])) {
 			octave--;
 			voicedChords[i][0] = "" + octave + voicedChords[i][0].substring(1);
-			System.out.println(voicedChords[i][0]);
 		}
 		
 	}
@@ -285,17 +284,28 @@ public class Main {
 
 		do {
 			Collections.shuffle(remainingTones);
-			voicedChords[i][0] = voicedChords[i-1][0].charAt(0) + chordToTone(chordProgression[i], 1);
+			
+			int bassOctave = Character.getNumericValue(voicedChords[i-1][0].charAt(0));
+			if(bassOctave <= 1) {
+				bassOctave++;
+			}
+			voicedChords[i][0] = "" + bassOctave + chordToTone(chordProgression[i], 1);
 			
 			for(int j = 1; j <= 3; j++) {
 				int octave = 8;
-				voicedChords[i][j] = Integer.toString(octave) + chordToTone(chordProgression[i], remainingTones.get(0));
+				if(remainingTones.size() <= 0) {	//For debugging
+					System.out.println(Arrays.toString(remainingTones.toArray()));
+				}
+				voicedChords[i][j] = "" + octave + chordToTone(chordProgression[i], remainingTones.get(0));
 				while(id(voicedChords[i][j]) - id(voicedChords[i][j-1]) > 12) {
 					octave--;
 					voicedChords[i][j] = Integer.toString(octave) + voicedChords[i][j].substring(1);
 				}
 				remainingTones.remove(0);
 			}
+			remainingTones.add(1);
+			remainingTones.add(3);
+			remainingTones.add(5);
 		} while(Arrays.equals(voicedChords[i-1], voicedChords[i]));		//This didn't work, it made two of same voicing in a row
 	}
 	
@@ -314,8 +324,9 @@ public class Main {
 	}
 	
 	private static void setChordProgression(int phrases) {
-		chordProgression = new int[] {1, 2, 3, 4, 5, 6, 7, 1};
+		chordProgression = new int[] {1, 6, 2, 5, 1, 6, 2, 5};
 		
+		///*
 		int[][] toOptions = {	{},
 								{1, 2, 3, 4, 5, 6},
 								{5},
@@ -333,6 +344,8 @@ public class Main {
 								{3}		//and sometimes 5
 		};
 		
+		int chanceOfRepeat = 90000;
+		
 		chordProgression = new int[8 * phrases];
 		for(int phrase = 1; phrase <= phrases; phrase++) {
 			chordProgression[8*(phrase-1)] = 1;
@@ -343,28 +356,24 @@ public class Main {
 					if(j == 7) {
 						chordProgression[phrases*8 -1] = 1;
 					} else {
-						if((int)(Math.random()*9) == 0) {
-							chordProgression[chordIndex] = chordProgression[chordIndex-1];
+						int prevChord = chordProgression[chordIndex-1];
+						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
+						if((int)(Math.random()*chanceOfRepeat) == 0) {
+							chordProgression[chordIndex] = prevChord;
 						} else {
-							int prevChord = chordProgression[chordIndex-1];
-							int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
-							if((int)(Math.random()*9) == 0) {
-								chordProgression[chordIndex] = prevChord;
-							} else {
-								int nextChord = toOptions[prevChord][randNextChord];
-								chordProgression[chordIndex] = nextChord;
-							}
+							int nextChord = toOptions[prevChord][randNextChord];
+							chordProgression[chordIndex] = nextChord;
 						}
 					}
 					
 				} else {
 					
 					if(j == 7) {
-						chordProgression[phrases*8 -1] = 5;
+						chordProgression[phrases*8 - 1] = 5;
 					} else {
 						int prevChord = chordProgression[chordIndex-1];
 						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
-						if((int)(Math.random()*9) == 0) {
+						if((int)(Math.random()*chanceOfRepeat) == 0) {
 							chordProgression[chordIndex] = prevChord;
 						} else {
 							int nextChord = toOptions[prevChord][randNextChord];
@@ -375,7 +384,8 @@ public class Main {
 				}
 			}
 		}
-		
+	
+		//*/
 	}
 	
 	private static void initStaff() {
