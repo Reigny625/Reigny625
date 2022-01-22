@@ -24,7 +24,7 @@ public class Main {
 	/*
 	 * Notes:
 	 * 
-	 * Got an infinite loop somehow (many times now)
+	 * The key variable doesn't affect anything.
 	 * 
 	 */
 
@@ -38,7 +38,7 @@ public class Main {
 			
 			initStaff();
 			
-			setChordProgression(1);
+			setChordProgression(2);
 			
 			voiceChords();
 			
@@ -53,21 +53,24 @@ public class Main {
 			System.out.println("\n");
 			
 			//Prints the entire voiced chord progression in groups groups (chords) of four notes
-			for(int i = 0; i < voicedChords.length; i++) {
-				System.out.print(chordToTone(chordProgression[i], 1) + ":");
-				System.out.print(Arrays.toString(voicedChords[i]));
-				System.out.print("  ");
-			}
+			printVoicings();
 			
 			playChords(1.3);
 			
 			
 		} catch (Exception e) {
 			e.printStackTrace();
-
-			for(int i = 0; i < voicedChords.length; i++) {
-				System.out.print(chordToTone(chordProgression[i], 1) + ":");
-				System.out.print(Arrays.toString(voicedChords[i]));
+			printVoicings();
+		}
+	}
+	
+	private static void printVoicings(){
+		for(int i = 0; i < voicedChords.length; i++) {
+			System.out.print(chordToTone(chordProgression[i], 1) + ":");
+			System.out.print(Arrays.toString(voicedChords[i]));
+			if((i+1)%8 == 0) {
+				System.out.println();
+			} else {
 				System.out.print("  ");
 			}
 		}
@@ -81,6 +84,8 @@ public class Main {
 			rest(1);
 		} catch (Exception e) {
 			e.printStackTrace();
+			System.out.println("Voicing finished, but playback failed");
+			printVoicings();
 		}
 	}
 	
@@ -108,13 +113,13 @@ public class Main {
 		
 		//All the other chords
 		for(int i = 1; i < chordProgression.length; i++) {	//loops through all non-bass voices of the chord under construction
-		//for (int i = 1; i < 7; i++) { //TEMPORARY LINE. Replace with above when ready
 			remainingTones = new ArrayList<Integer>();
 			remainingTones.add(1);
 			remainingTones.add(3);
 			remainingTones.add(5);
 			
 			if(chordProgression[i-1] == chordProgression[i]) {	//identifies if it's a repeated chord
+				
 				voiceStaticUnison(i);
 				
 			} else if(Math.abs(chordProgression[i-1] - chordProgression[i]) == 1 ||
@@ -124,9 +129,7 @@ public class Main {
 				voice27(i);
 				
 			} else {
-				
 				voice3645(i);
-				
 			}
 			
 		}
@@ -230,7 +233,8 @@ public class Main {
 						String possibleTargetNote = chordToTone(chordProgression[i], remainingTones.get(k));
 						if( Math.abs(id("4" + previousNote) - id("4" + possibleTargetNote)) < 3 ||
 							Math.abs(id("3" + previousNote) - id("4" + possibleTargetNote)) < 3 ||
-							Math.abs(id("4" + previousNote) - id("3" + possibleTargetNote)) < 3 ) {
+							Math.abs(id("4" + previousNote) - id("3" + possibleTargetNote)) < 3 ||
+							( (previousNote.equals("G#") && possibleTargetNote.equals("B")) || (previousNote.equals("B") && possibleTargetNote.equals("G#")) ) ) {
 							conjunctPossibilities++;
 							possibleConjunctCToneIndex = k;
 						}
@@ -324,7 +328,7 @@ public class Main {
 	}
 	
 	private static void setChordProgression(int phrases) {
-		chordProgression = new int[] {1, 6, 2, 5, 1, 6, 2, 5};
+		//chordProgression = new int[] {1, 1, 5, 6, 7, 5, 4, 7};
 		
 		///*
 		int[][] toOptions = {	{},
@@ -369,7 +373,7 @@ public class Main {
 				} else {
 					
 					if(j == 7) {
-						chordProgression[phrases*8 - 1] = 5;
+						chordProgression[phrase*8 - 1] = 5;
 					} else {
 						int prevChord = chordProgression[chordIndex-1];
 						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
@@ -390,9 +394,9 @@ public class Main {
 	
 	private static void initStaff() {
 		volume = 40; // between 0 and 127 inclusive
-		tempo = 60;	//tempo in bpm
+		tempo = 45 + (int)(Math.random()*36);
 		updateTempo();
-		key = 0; //(int)(Math.random()*12);
+		key = (int)(Math.random()*12);	//0;
 		isMajor = Math.random()<0.5;
 	}
 	
