@@ -24,7 +24,8 @@ public class Main {
 	/*
 	 * Notes:
 	 * 
-	 * The key variable doesn't affect anything.
+	 * The key variable doesn't affect anything. Finish adjustTheKey()
+	 * D#:[4D#, 4A#, 4G, 5D#]  G#:[4G#, 5C, 4G#, 5D#] happened. The tenor is higher than the alto
 	 * 
 	 */
 
@@ -38,9 +39,11 @@ public class Main {
 			
 			initStaff();
 			
-			setChordProgression(2);
+			setChordProgression(4);
 			
 			voiceChords();
+			
+			adjustToKey();
 			
 			System.out.println("The tempo is: " + tempo + "bpm");
 			System.out.println(noteName(key+12).substring(1) + " " + (isMajor ? "Major" : "minor"));
@@ -55,13 +58,17 @@ public class Main {
 			//Prints the entire voiced chord progression in groups groups (chords) of four notes
 			printVoicings();
 			
-			playChords(1.3);
+			playChords(1);
 			
 			
 		} catch (Exception e) {
 			e.printStackTrace();
 			printVoicings();
 		}
+	}
+	
+	private static void adjustToKey() {	//TO BE WRITTEN HEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHEREHERE TO BE WRITTEN
+		
 	}
 	
 	private static void printVoicings(){
@@ -328,15 +335,15 @@ public class Main {
 	}
 	
 	private static void setChordProgression(int phrases) {
-		//chordProgression = new int[] {1, 1, 5, 6, 7, 5, 4, 7};
+		//chordProgression = new int[] {1, 4, 7, 3, 6, 2, 5, 1, 1, 4, 7, 3, 6, 2, 5, 1};
 		
-		///*
+		//*
 		int[][] toOptions = {	{},
 								{1, 2, 3, 4, 5, 6},
 								{5},
 								{6},
 								{2, 3, 5},
-								{1},	//and sometimes 6
+								{1, 6},
 								{2, 4}
 		};
 		int[][] fromOptions = {	{},
@@ -345,46 +352,39 @@ public class Main {
 								{1, 4},
 								{1, 6},
 								{2, 4},
-								{3}		//and sometimes 5
+								{3, 5}
 		};
 		
-		int chanceOfRepeat = 90000;
+		int chanceOfRepeat = 12;
 		
 		chordProgression = new int[8 * phrases];
-		for(int phrase = 1; phrase <= phrases; phrase++) {
-			chordProgression[8*(phrase-1)] = 1;
-			for(int j = 1; j < 8; j++) {
-				int chordIndex = (phrase-1)*8 + j;
-				if(phrase == phrases) {
-					
-					if(j == 7) {
-						chordProgression[phrases*8 -1] = 1;
-					} else {
+		
+		for(int phrase = 0; phrase < phrases; phrase++) {
+			chordProgression[8*phrase] = 1;
+			if(phrase == phrases-1) {
+				chordProgression[phrase*8 + 7] = 1;
+				while(chordProgression[phrase*8 + 6] != 5) {
+					for(int chordIndex = phrase*8+1; chordIndex < phrase*8 + 7; chordIndex++) {
 						int prevChord = chordProgression[chordIndex-1];
-						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
 						if((int)(Math.random()*chanceOfRepeat) == 0) {
 							chordProgression[chordIndex] = prevChord;
 						} else {
-							int nextChord = toOptions[prevChord][randNextChord];
-							chordProgression[chordIndex] = nextChord;
+							int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
+							chordProgression[chordIndex] = toOptions[prevChord][randNextChord];
 						}
 					}
-					
-				} else {
-					
-					if(j == 7) {
-						chordProgression[phrase*8 - 1] = 5;
-					} else {
+				}
+			} else {
+				while(chordProgression[phrase*8 + 7] != 5) {
+					for(int chordIndex = phrase*8+1; chordIndex < phrase*8 + 8; chordIndex++) {
 						int prevChord = chordProgression[chordIndex-1];
-						int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
 						if((int)(Math.random()*chanceOfRepeat) == 0) {
 							chordProgression[chordIndex] = prevChord;
 						} else {
-							int nextChord = toOptions[prevChord][randNextChord];
-							chordProgression[chordIndex] = nextChord;
+							int randNextChord = (int)(Math.random()*(toOptions[prevChord].length));
+							chordProgression[chordIndex] = toOptions[prevChord][randNextChord];
 						}
 					}
-					
 				}
 			}
 		}
@@ -394,7 +394,8 @@ public class Main {
 	
 	private static void initStaff() {
 		volume = 40; // between 0 and 127 inclusive
-		tempo = 45 + (int)(Math.random()*36);
+		tempo = 40 + (int)(Math.random()*41);
+		//tempo = 40;
 		updateTempo();
 		key = (int)(Math.random()*12);	//0;
 		isMajor = Math.random()<0.5;
