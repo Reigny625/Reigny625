@@ -1,0 +1,652 @@
+package main;
+import java.util.Random;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+@SuppressWarnings("unused")
+public class Main {
+    private static final int cieling = 100;
+    private static final int targetPoints = 8;
+    private static final int generations = 1200;
+    private static final int genSize = 400;
+    private static final int polyDegree = 2;
+
+    public static void main(String[] args) throws CloneNotSupportedException {
+        ArrayList<Integer> values1 = new ArrayList<Integer>();
+        ArrayList<Integer> values2 = new ArrayList<Integer>();
+        Random random = new Random();
+
+        NeuralNet.setPolyDegree(polyDegree);
+        NeuralNet.initNodes(targetPoints);
+
+        //creates the target points
+        values1 = modelFunction();
+        
+        /*
+         * 		TRAINING (
+         */
+        
+        NeuralNet[] school = new NeuralNet[400];
+        double[] losses;
+        int[] topIndices;
+        
+        losses = new double[school.length];
+        topIndices = new int[(int)(losses.length / 4)];
+        for(int i = 0; i < school.length; i++) {
+        	school[i] = new NeuralNet();
+        }
+        
+        for(int gen = 0; gen < generations; gen++) {
+        	for(int i = 0; i < losses.length; i++) {
+        		losses[i] = 0;
+        	}
+        	for(int exam = 0; exam < 10; exam++) {
+        		for(int nn = 0; nn < school.length; nn++) {
+        			losses[nn] += school[nn].calcLoss(values1);
+        		}
+        		
+        		values1.clear();
+        		values1 = modelFunction();
+        	}
+        	
+        	for(int i = 0; i < losses.length; i++) {
+        		losses[i] /= 10.0;
+        	}
+        	
+        	double[] sortedLosses = new double[losses.length];
+        	for(int i = 0; i < losses.length; i++) {
+        		sortedLosses[i] = losses[i];
+        	}
+        	Arrays.sort(sortedLosses);
+        	for(int i = 0; i < topIndices.length; i++) {
+        		topIndices[i] = find(losses, sortedLosses[i]);
+        	}
+            
+        	//Creates the next generation
+        	NeuralNet[] tempSchool = new NeuralNet[school.length];
+        	for(int i = 0; i < school.length; i++) {
+        		tempSchool[i] = school[i];
+        	}
+        	for(int i = 0; i < school.length; i++) {
+        		if(i < topIndices.length) {
+        			school[i] = tempSchool[topIndices[i]];
+        		} else {
+        			NeuralNet parent = tempSchool[topIndices[(int)randDouble(0, topIndices.length)]];
+        			school[i] = parent.mutate(6);
+        		}
+        	}
+        	System.out.println(losses[topIndices[0]]);
+        }
+        System.out.println();
+        
+        
+        /*
+         * 		) TRAINING
+         */
+        
+
+        //Prints and graphs the best neural net student
+        ///*
+        System.out.println(losses[topIndices[0]]);
+        System.out.println(school[topIndices[0]].getPoly(values1));
+        for (int i = 0; i < values1.size(); i++) {
+            values2.add((int)NeuralNet.calcPoly(i, school[topIndices[0]].approximate(values1)));
+        }
+        /*
+        for (int i = 0; i < values2.size(); i++) {
+            values2.set(i, 0);
+        }
+        */
+        DrawGraph.graph(values1, values2);
+        //*/
+        
+    }
+    
+    private static ArrayList<Integer> modelFunction() {
+    	ArrayList<Integer> out = new ArrayList<Integer>();
+    	double slope = randDouble(-3, 3);
+    	double y = randDouble(0.3*cieling, 0.7*cieling);
+    	double curvature = 0;
+    	
+    	out.add((int)(y+0.5));
+    	for (int i = 1; i < targetPoints; i++) {
+    		if(i % 3 == 0) {
+    			curvature = randDouble(-5, 5);
+    			if(slope < 0 && y < cieling*0.5) {
+    				curvature = Math.abs(curvature);
+    			} else if(slope > 0 && y > cieling*0.5) {
+    				curvature = -1 * Math.abs(curvature);
+    			}
+    		}
+    		slope += curvature;
+    		y += slope;
+    		if(y < 0.5*cieling) {
+    			curvature += 1;
+    		} else if(y > 0.5*cieling) {
+    			curvature -= 1;
+    		}
+    		out.add((int)(y+0.5));
+        }
+    	
+    	return out;
+    }
+    
+    private static int find(double[] arr, double value) {
+    	for(int i = 0; i < arr.length; i++) {
+    		if(arr[i] == value) {
+    			return i;
+    		}
+    	}
+    	return -1;
+    }
+    
+    private static double randDouble(double min, double max){
+        double out = Math.random()*(max-min) + min;
+        return out;
+    }
+}
+
+
+
+
+
+
+
+package main;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+public class NeuralNet{
+    private static int numInNodes;
+    private static int hidNodesPerLayer;
+    private static int numHidLayers;
+    private static int numOutNodes;
+    private static int polyDegree;
+
+    private double[][][] hidWeights;
+    private double[][] hidBiases;
+    private double[][] outWeights;
+    private double[] outBiases;
+
+    public NeuralNet(){
+    	
+    	//Initializes all the hidden weights and biases
+        hidWeights = new double[numHidLayers][hidNodesPerLayer][numInNodes];
+        hidBiases = new double[numHidLayers][hidNodesPerLayer];
+        for(int i = 0; i < hidWeights.length; i++){
+            for(int j = 0; j < hidWeights[i].length; j++){
+            	for(int k = 0; k < hidWeights[i][j].length; k++) {
+            		hidWeights[i][j][k] = randDouble(-2, 2);
+            	}
+            	hidBiases[i][j] = randDouble(-2, 2);
+            }
+        }
+        
+      //Initializes all the end-layer weights and biases
+        outWeights = new double[numOutNodes][hidNodesPerLayer];
+        outBiases = new double[numOutNodes];
+        for(int i = 0; i < outWeights.length; i++){
+            for(int j = 0; j < outWeights[i].length; j++){
+                outWeights[i][j] = randDouble(-2, 2);
+            }
+            outBiases[i] = randDouble(-2, 2);
+        }
+        
+    }
+
+    public double[] approximate(ArrayList<Integer> targets){    //maybe not done?
+    	/*
+    	double[] out = {0, 1, 0};
+        return out;
+        */
+    	
+    	double[] inVals = new double[targets.size()];
+    	double[][] hidVals = new double[numHidLayers][hidNodesPerLayer];
+        double[] outVals = new double[numOutNodes];
+        
+        //calculates the in-values (copies them over from the targets ArrayList)
+        for(int i = 0; i < inVals.length; i++) {
+        	inVals[i] = (double)targets.get(i);
+        }
+        
+        //calculates the hid1 values
+        for(int node = 0; node < numHid1Nodes; node++) {
+        	double sum = 0;
+        	for(int coNode = 0; coNode < numInNodes; coNode++) {
+        		sum += hid1Weights[node][coNode] * inVals[coNode];
+        	}
+        	sum += hid1Biases[node];
+        	hid1Vals[node] = activate(sum);
+        }
+        
+      //calculates the hid2 values
+        for(int node = 0; node < numHid2Nodes; node++) {
+        	double sum = 0;
+        	for(int coNode = 0; coNode < numHid1Nodes; coNode++) {
+        		sum += hid2Weights[node][coNode] * hid1Vals[coNode];
+        	}
+        	sum += hid2Biases[node];
+        	hid2Vals[node] = activate(sum);
+        }
+        
+      //calculates the out values
+        for(int node = 0; node < numOutNodes; node++) {
+        	double sum = 0;
+        	for(int coNode = 0; coNode < numHid2Nodes; coNode++) {
+        		sum += outWeights[node][coNode] * hid2Vals[coNode];
+        	}
+        	sum += outBiases[node];
+        	outVals[node] = endActivate(sum);
+        }
+        
+        return outVals;
+    }
+    
+    public NeuralNet gradDescend() {	//NOT DONE
+    	
+    	return new NeuralNet();	//This is not done, it's just subbing in so that Eclipse doesn't yell at me	NOTDONENOTDONE
+    }
+    public NeuralNet mutate(int rate) throws CloneNotSupportedException {
+    	NeuralNet newNet = this.cloneNN();
+    	final double wVariation = 0.2;
+    	final double bVariation = 2;
+    	
+    	//hid1Weights
+    	for(int i = 0; i < hid1Weights.length; i++) {
+    		for(int j = 0; j < hid1Weights[i].length; j++) {
+    			if(randDouble(0.0, (double)rate) < 1.0) {
+    				newNet.hid1Weights[i][j] += randDouble(-1*wVariation, wVariation);
+    			}
+    		}
+    	}
+    	
+        //hid1Biases
+    	for(int i = 0; i < hid1Biases.length; i++) {
+			if(randDouble(0.0, (double)rate) < 1.0) {
+				newNet.hid1Biases[i] += randDouble(-1*bVariation, bVariation);
+			}
+		}
+    	
+    	//hid2Weights
+    	for(int i = 0; i < hid2Weights.length; i++) {
+    		for(int j = 0; j < hid2Weights[i].length; j++) {
+    			if(randDouble(0.0, (double)rate) < 1.0) {
+    				newNet.hid2Weights[i][j] += randDouble(-1*wVariation, wVariation);
+    			}
+    		}
+    	}
+    	
+    	//hid2Biases
+    	for(int i = 0; i < hid2Biases.length; i++) {
+			if(randDouble(0.0, (double)rate) < 1.0) {
+				newNet.hid2Biases[i] += randDouble(-1*bVariation, bVariation);
+			}
+		}
+    	
+    	//outWeights
+    	for(int i = 0; i < outWeights.length; i++) {
+    		for(int j = 0; j < outWeights[i].length; j++) {
+    			if(randDouble(0.0, (double)rate) < 1.0) {
+    				newNet.outWeights[i][j] += randDouble(-1*wVariation, wVariation);
+    			}
+    		}
+    	}
+    	
+    	//outBiases
+    	for(int i = 0; i < outBiases.length; i++) {
+			if(randDouble(0.0, (double)rate) < 1.0) {
+				newNet.outBiases[i] += randDouble(-1*bVariation, bVariation);
+			}
+		}
+    	
+    	return newNet;
+    }
+    
+    public double calcLoss(ArrayList<Integer> targets) {
+    	double sumDistance = 0;
+    	double[] coefficients = this.approximate(targets);
+    	for(int x = 0; x < targets.size(); x++) {
+    		sumDistance += Math.abs(calcPoly(x, coefficients) - targets.get(x));
+    	}
+    	return sumDistance / (double)targets.size();
+    }
+    public static double calcPoly(int x, double[] coefficients) {
+    	double out = 0;
+    	for(int degree = 0; degree < coefficients.length; degree++){
+            out += coefficients[degree]*Math.pow(x, degree);
+        }
+    	return out;
+    }
+    
+    private static double activate(double in) {
+    	double out;
+    	if(in >= 0) {
+    		out = in;
+    	} else {
+    		out = Math.pow(Math.E, in) - 1;
+    		//out = 0.002*in;
+    	}
+    	return out;
+    }
+    private static double endActivate(double in) {
+    	double out = in;
+    	return out;
+    }
+
+    public static void initNodes(int inNodes){
+        numInNodes = inNodes;
+        numHid1Nodes = numInNodes + polyDegree + 4;
+        numHid2Nodes = numInNodes + polyDegree + 2;
+        numOutNodes =  polyDegree + 1;
+    }
+
+    private NeuralNet cloneNN() {
+    	NeuralNet out = new NeuralNet();
+    	
+    	//out.hid1Weights = this.hid1Weights;
+    	for(int i = 0; i < hid1Weights.length; i++) {
+    		for(int j = 0; j < hid1Weights[i].length; j++) {
+    			out.hid1Weights[i][j] = this.hid1Weights[i][j];
+    		}
+    	}
+    	
+    	//out.hid1Biases = this.hid1Biases;
+    	for(int i = 0; i < hid1Biases.length; i++) {
+    		out.hid1Biases[i] = this.hid1Biases[i];
+    	}
+    	
+    	//out.hid2Weights = this.hid2Weights;
+    	for(int i = 0; i < hid2Weights.length; i++) {
+    		for(int j = 0; j < hid2Weights[i].length; j++) {
+    			out.hid2Weights[i][j] = this.hid2Weights[i][j];
+    		}
+    	}
+    	
+    	//out.hid2Biases = this.hid2Biases;
+    	for(int i = 0; i < hid2Biases.length; i++) {
+    		out.hid2Biases[i] = this.hid2Biases[i];
+    	}
+    	
+    	//out.outWeights = this.outWeights;
+    	for(int i = 0; i < outWeights.length; i++) {
+    		for(int j = 0; j < outWeights[i].length; j++) {
+    			out.outWeights[i][j] = this.outWeights[i][j];
+    		}
+    	}
+    	
+    	//out.outBiases = this.outBiases;
+    	for(int i = 0; i < outBiases.length; i++) {
+    		out.outBiases[i] = this.outBiases[i];
+    	}
+    	
+    	return out;
+    }
+    
+    public boolean equals(NeuralNet other) {
+    	boolean out = true;
+    	if(!Arrays.equals(this.hid1Weights, other.hid1Weights)) {
+    		out = false;
+    	}
+    	if(!Arrays.equals(this.hid1Biases, other.hid1Biases)) {
+    		out = false;
+    	}
+    	if(!Arrays.equals(this.hid2Weights, other.hid2Weights)) {
+    		out = false;
+    	}
+    	if(!Arrays.equals(this.hid2Biases, other.hid2Biases)) {
+    		out = false;
+    	}
+    	if(!Arrays.equals(this.outWeights, other.outWeights)) {
+    		out = false;
+    	}
+    	if(!Arrays.equals(this.outBiases, other.outBiases)) {
+    		out = false;
+    	}
+    	
+    	return out;
+    }
+    
+    public String getPoly(ArrayList<Integer> targets){
+    	double[] coefficients = this.approximate(targets);
+    	String out = "" + coefficients[0];
+    	for(int i = 1; i < coefficients.length; i++) {
+    		out = "" + coefficients[i] + "x^" + i + " + " + out;
+    	}
+    	return out;
+    }
+    public static int getPolyDegree(){
+        return polyDegree;
+    }
+    public static void setPolyDegree(int degree){
+        polyDegree = degree;
+    }
+    private static double randDouble(double min, double max){
+        double out = Math.random()*(max-min) + min;
+        return out;
+    }
+}
+
+
+
+
+
+
+
+package main;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.RenderingHints;
+import java.awt.Stroke;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Collections;
+import javax.swing.*;
+
+@SuppressWarnings("serial")
+public class DrawGraph extends JPanel {
+    private static int MAX_SCORE;
+    private static final int PREF_W = 800;
+    private static final int PREF_H = 650;
+    private static final int BORDER_GAP = 30;
+    private static final Color GRAPH_COLOR1 = Color.GREEN;
+    private static final Color GRAPH_COLOR2 = Color.RED;
+    private static final Color GRAPH_POINT_COLOR = Color.BLACK;
+    private static final Stroke GRAPH_STROKE = new BasicStroke(3f);
+    private static final int GRAPH_POINT_WIDTH = 12;
+    private static final int Y_HATCH_CNT = 10;
+    private List<Integer> scores1;
+    private List<Integer> scores2;
+
+    public DrawGraph(List<Integer> scores1, List<Integer> scores2) {
+        List<Integer> sortedList = new ArrayList<Integer>();
+        sortedList.addAll(scores1);
+        sortedList.addAll(scores2);
+        Collections.sort(sortedList);
+        MAX_SCORE = sortedList.get(sortedList.size() - 1);
+        this.scores1 = scores1;
+        this.scores2 = scores2;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D)g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        double xScale = ((double) getWidth() - 2 * BORDER_GAP) / (scores2.size() - 1);
+        double yScale = ((double) getHeight() - 2 * BORDER_GAP) / (MAX_SCORE - 1);
+
+        List<Point> graphPoints1 = new ArrayList<Point>();
+        for (int i = 0; i < scores1.size(); i++) {
+            int x1 = (int) ( (i * xScale + BORDER_GAP) * (scores2.size() / (double)scores1.size()) );
+            int y1 = (int) ((MAX_SCORE - scores1.get(i)) * yScale + BORDER_GAP);
+            graphPoints1.add(new Point(x1, y1));
+        }
+        List<Point> graphPoints2 = new ArrayList<Point>();
+        for (int i = 0; i < scores2.size(); i++) {
+            int x1 = (int) (i * xScale + BORDER_GAP);
+            int y1 = (int) ((MAX_SCORE - scores2.get(i)) * yScale + BORDER_GAP);
+            graphPoints2.add(new Point(x1, y1));
+        }
+
+        // create x and y axes 
+        g2.drawLine(BORDER_GAP, getHeight() - BORDER_GAP, BORDER_GAP, BORDER_GAP);
+        g2.drawLine(BORDER_GAP, getHeight() - BORDER_GAP, getWidth() - BORDER_GAP, getHeight() - BORDER_GAP);
+
+        // create hatch marks for y axis. 
+        for (int i = 0; i < Y_HATCH_CNT; i++) {
+            int x0 = BORDER_GAP;
+            int x1 = GRAPH_POINT_WIDTH + BORDER_GAP;
+            int y0 = getHeight() - (((i + 1) * (getHeight() - BORDER_GAP * 2)) / Y_HATCH_CNT + BORDER_GAP);
+            int y1 = y0;
+            g2.drawLine(x0, y0, x1, y1);
+        }
+
+        // and for x axis
+        for (int i = 0; i < scores1.size() - 1; i++) {
+            int x0 = (i + 1) * (getWidth() - BORDER_GAP * 2) / (scores1.size() - 1) + BORDER_GAP;
+            int x1 = x0;
+            int y0 = getHeight() - BORDER_GAP;
+            int y1 = y0 - GRAPH_POINT_WIDTH;
+            g2.drawLine(x0, y0, x1, y1);
+        }
+
+        //Function 1:
+        Stroke oldStroke = g2.getStroke();
+        g2.setColor(GRAPH_COLOR1);
+        g2.setStroke(GRAPH_STROKE);
+        /*  //Draws Function 2 Line segments
+        for (int i = 0; i < graphPoints1.size() - 1; i++) {
+            int x1 = graphPoints1.get(i).x;
+            int y1 = graphPoints1.get(i).y;
+            int x2 = graphPoints1.get(i + 1).x;
+            int y2 = graphPoints1.get(i + 1).y;
+            g2.drawLine(x1, y1, x2, y2);         
+        }
+        */
+
+        g2.setStroke(oldStroke);      
+        g2.setColor(GRAPH_POINT_COLOR);
+        //Plots Function 1 points
+        for (int i = 0; i < graphPoints1.size(); i++) {
+            int x = graphPoints1.get(i).x - GRAPH_POINT_WIDTH / 2;
+            int y = graphPoints1.get(i).y - GRAPH_POINT_WIDTH / 2;;
+            int ovalW = GRAPH_POINT_WIDTH;
+            int ovalH = GRAPH_POINT_WIDTH;
+            g2.fillOval(x, y, ovalW, ovalH);
+        }
+
+        //Function 2:
+        g2.setColor(GRAPH_COLOR2);
+        g2.setStroke(GRAPH_STROKE);
+        //Draws Function 2 Line segments
+        for (int i = 0; i < graphPoints2.size() - 1; i++) {
+            int x1 = graphPoints2.get(i).x;
+            int y1 = graphPoints2.get(i).y;
+            int x2 = graphPoints2.get(i + 1).x;
+            int y2 = graphPoints2.get(i + 1).y;
+            g2.drawLine(x1, y1, x2, y2);
+        }
+        /*
+        if(true){
+            g2.setStroke(oldStroke); 
+            int x = graphPoints2.get(0).x - GRAPH_POINT_WIDTH / 2;
+            int y = graphPoints2.get(0).y - GRAPH_POINT_WIDTH / 2;;
+            int ovalW = GRAPH_POINT_WIDTH;
+            int ovalH = GRAPH_POINT_WIDTH;
+            g2.fillOval(x, y, ovalW, ovalH);
+            x = graphPoints2.get(graphPoints2.size()-1).x - GRAPH_POINT_WIDTH / 2;
+            y = graphPoints2.get(graphPoints2.size()-1).y - GRAPH_POINT_WIDTH / 2;;
+            ovalW = GRAPH_POINT_WIDTH;
+            ovalH = GRAPH_POINT_WIDTH;
+            g2.fillOval(x, y, ovalW, ovalH);
+        }
+        */
+
+        /*
+        g2.setStroke(oldStroke);      
+        g2.setColor(GRAPH_POINT_COLOR);
+        //Plots Function 2 points
+        for (int i = 0; i < graphPoints2.size(); i++) {
+            int x = graphPoints2.get(i).x - GRAPH_POINT_WIDTH / 2;
+            int y = graphPoints2.get(i).y - GRAPH_POINT_WIDTH / 2;;
+            int ovalW = GRAPH_POINT_WIDTH;
+            int ovalH = GRAPH_POINT_WIDTH;
+            g2.fillOval(x, y, ovalW, ovalH);
+        }
+        */
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        return new Dimension(PREF_W, PREF_H);
+    }
+
+    public static void graph(ArrayList<Integer> data1, ArrayList<Integer> data2) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                DrawGraph mainPanel1 = new DrawGraph(data1, data2);
+
+                JFrame frame = new JFrame("DrawGraph");
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.getContentPane().add(mainPanel1);
+                frame.pack();
+                frame.setLocationByPlatform(true);
+                frame.setVisible(true);
+            }
+        });
+    }
+}
+
+
+
+
+
+
+
+package main;
+
+public abstract class NeuralNetTrainer {
+
+	public NeuralNetTrainer() {
+		// TODO Auto-generated constructor stub
+	}
+
+}
+
+
+
+
+
+
+
+package main;
+
+public class TrendlineTrainer {
+
+	public TrendlineTrainer() {
+		// TODO Auto-generated constructor stub
+	}
+
+}
+
+
+
+
+
+
+
+package main;
+
+public class ImageTrainer {
+
+	public ImageTrainer() {
+		// TODO Auto-generated constructor stub
+	}
+
+}
